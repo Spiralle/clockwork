@@ -3,9 +3,11 @@
 namespace Spiralle\Clockwork\Bootloader;
 
 use Spiral\Boot\Bootloader\Bootloader;
+use Spiral\Core\Attribute\Singleton;
 use Spiral\Monolog\Bootloader\MonologBootloader;
 use Spiralle\Clockwork\Log\ClockworkLogger;
 
+#[Singleton]
 final class ClockworkLoggingBootloader extends Bootloader
 {
 

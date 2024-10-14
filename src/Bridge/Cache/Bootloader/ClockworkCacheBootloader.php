@@ -8,12 +8,14 @@ use Spiral\Cache\Event\CacheHit;
 use Spiral\Cache\Event\CacheMissed;
 use Spiral\Cache\Event\KeyDeleted;
 use Spiral\Cache\Event\KeyWritten;
+use Spiral\Core\Attribute\Singleton;
 use Spiral\Events\Bootloader\EventsBootloader;
 use Spiral\Events\ListenerFactoryInterface;
 use Spiral\Events\ListenerRegistryInterface;
 use Spiralle\Clockwork\Bridge\Cache\Listener\ClockworkCacheListener;
 use Spiralle\Clockwork\Provider\ClockworkDataSourceProviderRegistry;
 
+#[Singleton]
 final class ClockworkCacheBootloader extends Bootloader
 {
 

@@ -3,6 +3,7 @@
 namespace Spiralle\Clockwork\Bootloader;
 
 use Spiral\Boot\Bootloader\Bootloader;
+use Spiral\Core\Attribute\Singleton;
 use Spiral\Events\Bootloader\EventsBootloader;
 use Spiral\Events\ListenerFactoryInterface;
 use Spiral\Events\ListenerRegistryInterface;
@@ -10,6 +11,7 @@ use Spiral\Http\Event\MiddlewareProcessing;
 use Spiralle\Clockwork\Listener\ClockworkMiddlewareListener;
 use Spiralle\Clockwork\Provider\ClockworkDataSourceProviderRegistry;
 
+#[Singleton]
 final class ClockworkMiddlewareBootloader extends Bootloader
 {
 
