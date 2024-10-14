@@ -17,32 +17,24 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Spiral\Boot\DirectoriesInterface;
 use Spiral\Boot\EnvironmentInterface;
-use Spiral\Core\Container;
-use Spiral\Core\ScopeInterface;
-use Spiral\Events\ListenerFactoryInterface;
-use Spiral\Events\ListenerRegistryInterface;
-use Spiral\Http\Event\MiddlewareProcessing;
-use Spiralle\Clockwork\Listener\ClockworkMiddlewareListener;
 use Spiralle\Clockwork\Log\ClockworkGlobalLogger;
 use Spiralle\Clockwork\Provider\ClockworkDataSourceProviderRegistry;
 
 final class ClockworkMiddleware implements MiddlewareInterface
 {
 
+	public const Attribute = 'clockwork';
 	public const StartTimeBag = 'clockwork.start_time';
+
 	private const AuthUri = '#/__clockwork/auth#';
 	private const DataUri = '#/__clockwork(?:/(?<id>([0-9-]+|latest)))?(?:/(?<direction>(?:previous|next)))?(?:/(?<count>\d+))?#';
 
-	private readonly Clockwork $clockwork;
-
 	public function __construct(
 		private readonly DirectoriesInterface $directories,
-		private readonly ScopeInterface $scope,
 		private readonly ClockworkDataSourceProviderRegistry $providers,
 		private readonly EnvironmentInterface $environment,
 	)
 	{
-		$this->clockwork = $this->createDefaultClockwork();
 	}
 
 	public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -51,14 +43,16 @@ final class ClockworkMiddleware implements MiddlewareInterface
 			return $handler->handle($request);
 		}
 
+		$clockwork = $this->createDefaultClockwork();
+
 		if (preg_match(self::AuthUri, $request->getUri()->getPath())) {
-			return $this->authenticate($request);
+			return $this->authenticate($clockwork, $request);
 		}
 
 		if (preg_match(self::DataUri, $request->getUri()->getPath(), $matches)) {
 			$matches = array_merge([ 'id' => null, 'direction' => null, 'count' => null ], $matches);
 
-			return $this->retrieveRequest($request, $matches['id'], $matches['direction'], $matches['count']);
+			return $this->retrieveRequest($clockwork, $request, $matches['id'], $matches['direction'], $matches['count']);
 		}
 
 		$startTime = $request->getAttribute(self::StartTimeBag);
@@ -69,30 +63,17 @@ final class ClockworkMiddleware implements MiddlewareInterface
 			$startTime = microtime(true);
 		}
 
-		ClockworkGlobalLogger::instance($this->clockwork);
+		ClockworkGlobalLogger::instance($clockwork);
 
-		$response = $this->scope->runScope([
-			Clockwork::class => $this->clockwork,
-		], function (Container $container) use ($request, $handler) {
-			if ($container->has(ListenerRegistryInterface::class)) {
-				/** @var ListenerRegistryInterface $registry */
-				$registry = $container->get(ListenerRegistryInterface::class);
-				/** @var ListenerFactoryInterface $factory */
-				$factory = $container->get(ListenerFactoryInterface::class);
+		$response = $handler->handle($request);
 
-				$registry->addListener(MiddlewareProcessing::class, $factory->create(ClockworkMiddlewareListener::class, '__invoke'));
-			}
-
-			return $handler->handle($request);
-		});
-
-		return $this->logRequest($request, $response, $startTime);
+		return $this->logRequest($clockwork, $request->withAttribute(self::Attribute, $clockwork), $response, $startTime);
 	}
 
-	private function authenticate(ServerRequestInterface $request): ResponseInterface
+	private function authenticate(Clockwork $clockwork, ServerRequestInterface $request): ResponseInterface
 	{
 		$data = $request->getParsedBody();
-		$token = $this->clockwork->authenticator()->attempt(is_array($data) ? $data : []);
+		$token = $clockwork->authenticator()->attempt(is_array($data) ? $data : []);
 
 		return $this->jsonResponse(['token' => $token], $token ? 200 : 403);
 	}
@@ -117,12 +98,12 @@ final class ClockworkMiddleware implements MiddlewareInterface
 		return new Response($status, ['Content-Type' => 'application/json'], $data === null ? null : json_encode($data, JSON_THROW_ON_ERROR));
 	}
 
-	private function retrieveRequest(ServerRequestInterface $request, ?string $id, ?string $direction, ?string $count): ResponseInterface
+	private function retrieveRequest(Clockwork $clockwork, ServerRequestInterface $request, ?string $id, ?string $direction, ?string $count): ResponseInterface
 	{
 		/** @var AuthenticatorInterface $authenticator */
-		$authenticator = $this->clockwork->authenticator();
+		$authenticator = $clockwork->authenticator();
 		/** @var StorageInterface $storage */
-		$storage = $this->clockwork->storage();
+		$storage = $clockwork->storage();
 
 		$authenticated = $authenticator->check(current($request->getHeader('X-Clockwork-Auth')));
 
@@ -147,22 +128,22 @@ final class ClockworkMiddleware implements MiddlewareInterface
 		return $this->jsonResponse($data?->toArray());
 	}
 
-	private function logRequest(ServerRequestInterface $request, ResponseInterface $response, float $startTime): ResponseInterface
+	private function logRequest(Clockwork $clockwork, ServerRequestInterface $request, ResponseInterface $response, float $startTime): ResponseInterface
 	{
-		$this->clockwork->timeline()->finalize($startTime);
-		$this->clockwork->addDataSource(new PsrMessageDataSource($request, $response));
-		$this->providers->injectTo($this->clockwork);
+		$clockwork->timeline()->finalize($startTime);
+		$clockwork->addDataSource(new PsrMessageDataSource($request, $response));
+		$this->providers->injectTo($clockwork);
 
 		/** @var Request $clockworkRequest */
-		$clockworkRequest = $this->clockwork->request();
+		$clockworkRequest = $clockwork->request();
 
 		$clockworkRequest->memoryUsage = memory_get_peak_usage(true);
 
-		$this->clockwork->resolveRequest();
-		$this->clockwork->storeRequest();
+		$clockwork->resolveRequest();
+		$clockwork->storeRequest();
 
 		/** @var Request $clockworkRequest */
-		$clockworkRequest = $this->clockwork->request();
+		$clockworkRequest = $clockwork->request();
 
 		$response = $response
 			->withHeader('X-Clockwork-Id', $clockworkRequest->id)

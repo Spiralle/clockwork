@@ -41,7 +41,8 @@ public function defineBootloaders(): array
 {
 	return [
 		// ...
-
+		// Clockwork Scope - Required
+        ClockworkBootloader::class,
 		// Displays middlewares in the "middleware" section
 		ClockworkMiddlewareBootloader::class => new BootloadConfig(allowEnv: ['APP_ENV' => ['local']]),
 		// Displays database queries in the "database" tab
@@ -68,7 +69,7 @@ final class RoutesBootloader extends BaseRoutesBootloader
 	protected function globalMiddleware(): array
 	{
 		return [
-			// Should be the first middleware
+			// Should be the first middleware - Required
 			ClockworkMiddleware::class,
 		];
 	}

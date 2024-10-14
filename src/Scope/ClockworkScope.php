@@ -3,29 +3,25 @@
 namespace Spiralle\Clockwork\Scope;
 
 use Clockwork\Clockwork;
-use Spiral\Core\Container;
+use LogicException;
 
 final class ClockworkScope
 {
 
 	public function __construct(
-		private readonly Container $container,
+		private readonly ?Clockwork $clockwork,
 	)
 	{
 	}
 
 	public function getClockwork(): Clockwork
 	{
-		return $this->container->get(Clockwork::class);
+		return $this->clockwork ?? throw new LogicException('Clockwork instance is not available.');
 	}
 
 	public function getClockworkOrNull(): ?Clockwork
 	{
-		if ($this->container->has(Clockwork::class)) {
-			return $this->container->get(Clockwork::class);
-		}
-
-		return null;
+		return $this->clockwork;
 	}
 
 }

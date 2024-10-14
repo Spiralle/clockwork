@@ -22,6 +22,12 @@
 		"spiral/boot": "^3.14",
 		"spiral/monolog-bridge": "^3.14",
 		"spiral/cache": "^3.14",
-		"spiral/cycle-bridge": "^2.10"
+		"spiral/cycle-bridge": "^2.10",
+		"spiral/framework": "^3.14"
+	},
+	"config": {
+		"allow-plugins": {
+			"spiral/composer-publish-plugin": true
+		}
 	}
 }
